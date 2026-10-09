@@ -38,7 +38,7 @@ jobs:
           chmod a+w report_html.html
 
       # 2. Executamos o ZAP diretamente via Docker, mapeando a rede e o volume
-      - name: Varredura DAST via Docker
+      - name: Varredura DAST Completa via Docker (Active Scan)
         run: |
           docker run -v $(pwd):/zap/wrk/:rw --network=host -t ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py -t http://localhost:8000 -r report_html.html || true
           # O operador '|| true' no shell impede que o pipeline quebre (Crash)
