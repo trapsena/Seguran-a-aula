@@ -1,0 +1,53 @@
+name: Teste de Segurança DAST (OWASP ZAP)
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  analise_dast:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Baixa o código do repositório
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+      # 2. Prepara o ambiente Python
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      # 3. Instala dependências e sobe a aplicação em background
+      # '&' é usado para rodar em background e,
+      #o sleep é usado para dar tempo da aplicação subir antes do ZAP iniciar a varredura
+      - name: Iniciar a Aplicação FastAPI
+        run: |
+          pip install fastapi uvicorn
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+
+      # 1. Preparamos o arquivo(relatorio) em branco e damos permissão de escrita
+      # para que o usuário 'zap' dentro do Docker consiga salvar o relatório
+      - name: Preparar Permissões do Relatório
+        run: |
+          touch report_html.html
+          chmod a+w report_html.html
+
+      # 2. Executamos o ZAP diretamente via Docker, mapeando a rede e o volume
+      - name: Varredura DAST via Docker
+        run: |
+          docker run -v $(pwd):/zap/wrk/:rw --network=host -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://localhost:8000 -r report_html.html || true
+          # O operador '|| true' no shell impede que o pipeline quebre (Crash)
+          # caso o ZAP retorne código de erro ao encontrar vulnerabilidades.
+
+      # 3. Fazemos o upload do HTML usando a Action (v4)
+      - name: Disponibilizar Relatório HTML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relatorio-dast-html
+          path: report_html.html
