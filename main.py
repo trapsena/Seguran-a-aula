@@ -47,22 +47,16 @@ def buscar_aluno(aluno: str):
     conn = sqlite3.connect("universidade.db")
     cursor = conn.cursor()
 
-    # CORREÇÃO DO SQL INJECTION
-    # 1. Removemos a f-string.
-    # 2. Substituímos a variável diretamente na string por um placeholder '?'.
-    # Em bancos de dados como o PostgreSQL (via psycopg2) usar-se-ia '%s',
-    # mas no SQLite a convenção é a interrogação.
-    query = "SELECT nome, nota FROM alunos WHERE nome = ?"
+    # Concatenação direta de string na query SQL.
+    # O ZAP testará payloads como: ' OR '1'='1
+    query = f"SELECT nome, nota FROM alunos WHERE nome = '{aluno}'"
 
     try:
-        # Passamos a variável 'aluno' como uma tupla (aluno,) no segundo argumento do método execute.
-        # A separação entre instrução e dados é feita internamente pelo driver do SQLite.
-        cursor.execute(query, (aluno,))
-
+        cursor.execute(query)
         resultados = cursor.fetchall()
-        return {"resultados": resultados}
-    except Exception:
-        # Substituído o retorno do erro nativo por uma mensagem genérica para evitar Information Disclosure.
-        return {"erro": "Ocorreu um erro interno ao processar a busca."}
+        return {"resultados": resultados, "query_executada": query}
+    except Exception as e:
+        # Expor o erro do banco de dados (Stack Trace) facilita a vida do atacante
+        return {"erro": str(e)}
     finally:
         conn.close()
